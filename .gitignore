@@ -1,0 +1,32 @@
+*.iml
+.gradle
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Firebase
+google-services.json
+
+# Gradle
+.gradle/
+build/
+
+# Android Studio
+*.iml
+*.iws
+*.ipr
+.idea/
+
+# Generated files
+bin/
+gen/
+out/
+
+# Keystore files
+*.jks
+*.keystore

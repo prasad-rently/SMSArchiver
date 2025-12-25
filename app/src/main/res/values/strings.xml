@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">SMS Archiver</string>
+    <string name="permission_required">SMS permissions required</string>
+    <string name="grant_permission">Grant Permission</string>
+    <string name="permission_denied">Permission denied. App cannot function without SMS access.</string>
+    <string name="sms_count">SMS Messages: %d</string>
+    <string name="last_sync">Last Sync: %s</string>
+    <string name="sync_status">Status: %s</string>
+    <string name="start_monitoring">Start Monitoring</string>
+    <string name="stop_monitoring">Stop Monitoring</string>
+    <string name="monitoring_active">Monitoring Active</string>
+    <string name="monitoring_inactive">Monitoring Inactive</string>
+    <string name="notification_channel_name">SMS Monitoring</string>
+    <string name="notification_channel_desc">Shows when SMS monitoring is active</string>
+    <string name="notification_title">SMS Archiver Running</string>
+    <string name="notification_text">Monitoring SMS messages</string>
+</resources>
