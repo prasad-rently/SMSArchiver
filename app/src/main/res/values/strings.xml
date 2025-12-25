@@ -14,4 +14,8 @@
     <string name="notification_channel_desc">Shows when SMS monitoring is active</string>
     <string name="notification_title">SMS Archiver Running</string>
     <string name="notification_text">Monitoring SMS messages</string>
+    <string name="new_sms_received">New SMS Received!</string>
+    <string name="firebase_not_configured">Firebase not configured - SMS will not be uploaded</string>
+    <string name="queue_count">Upload Queue: %d</string>
+    
 </resources>

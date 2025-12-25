@@ -3,11 +3,16 @@ package com.prasad.smsarchiver.ui
 import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Context.RECEIVER_EXPORTED
+import android.content.Context.RECEIVER_NOT_EXPORTED
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -35,9 +40,31 @@ class MainActivity : ComponentActivity() {
     
     private val smsReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            Log.d("MainActivity", "📩 Received NEW_SMS broadcast, refreshing UI...")
-            // Auto-refresh messages when new SMS arrives
-            viewModel.loadMessages()
+            Log.d("MainActivity", "📩 ============ BROADCAST RECEIVED ============")
+            Log.d("MainActivity", "📩 Action: ${intent?.action}")
+            Log.d("MainActivity", "📩 Context: $context")
+            Log.d("MainActivity", "📩 Refreshing UI now...")
+            
+            // Show toast notification
+            Toast.makeText(
+                this@MainActivity,
+                "📱 New SMS Received! Refreshing...",
+                Toast.LENGTH_SHORT
+            ).show()
+            
+            // Auto-refresh messages when new SMS arrives with a small delay
+            // to allow Telephony provider to commit the SMS row.
+            Handler(Looper.getMainLooper()).postDelayed({
+                viewModel.loadMessages()
+                Log.d("MainActivity", "📩 UI refresh triggered (delayed)!")
+            }, 800)
+
+            // Schedule a second refresh as a safety net
+            Handler(Looper.getMainLooper()).postDelayed({
+                viewModel.loadMessages()
+                Log.d("MainActivity", "📩 UI refresh triggered (second pass)!")
+            }, 2200)
+            Log.d("MainActivity", "📩 ===========================================")
         }
     }
 
@@ -46,12 +73,19 @@ class MainActivity : ComponentActivity() {
         
         // Register receiver for new SMS notifications
         val filter = IntentFilter("com.prasad.smsarchiver.NEW_SMS")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(smsReceiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(smsReceiver, filter)
+        Log.d("MainActivity", "📡 Registering broadcast receiver...")
+        Log.d("MainActivity", "📡 Filter action: com.prasad.smsarchiver.NEW_SMS")
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                // Use RECEIVER_EXPORTED to allow receiving broadcasts from other components
+                registerReceiver(smsReceiver, filter, RECEIVER_EXPORTED)
+            } else {
+                registerReceiver(smsReceiver, filter)
+            }
+            Log.d("MainActivity", "📡 ✅ Receiver registered successfully!")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "📡 ❌ Failed to register receiver: ${e.message}", e)
         }
-        Log.d("MainActivity", "Registered NEW_SMS receiver")
         
         setContent {
             SMSArchiverTheme {
@@ -62,6 +96,16 @@ class MainActivity : ComponentActivity() {
                     MainScreen(viewModel)
                 }
             }
+        }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            unregisterReceiver(smsReceiver)
+            Log.d("MainActivity", "Unregistered NEW_SMS receiver")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error unregistering receiver: ${e.message}")
         }
     }
 }
@@ -197,6 +241,15 @@ fun MainContent(
                         MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(top = 4.dp)
                 )
+
+                Text(
+                    text = stringResource(R.string.queue_count, uiState.queuedCount),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+
+                
             }
         }
 
@@ -226,6 +279,8 @@ fun MainContent(
             ) {
                 Text("Refresh")
             }
+
+            
         }
 
         // Messages List
@@ -299,15 +354,4 @@ fun SmsMessageItem(message: SmsMessage) {
 private fun formatTimestamp(timestamp: Long): String {
     val dateFormat = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
     return dateFormat.format(Date(timestamp))
-}
-    
-    override fun onDestroy() {
-        super.onDestroy()
-        try {
-            unregisterReceiver(smsReceiver)
-            Log.d("MainActivity", "Unregistered NEW_SMS receiver")
-        } catch (e: Exception) {
-            Log.e("MainActivity", "Error unregistering receiver: ${e.message}")
-        }
-    }
 }

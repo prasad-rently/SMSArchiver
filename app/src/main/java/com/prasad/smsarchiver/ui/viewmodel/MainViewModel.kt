@@ -6,6 +6,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.prasad.smsarchiver.data.model.SmsMessage
 import com.prasad.smsarchiver.data.repository.SmsRepository
+import com.prasad.smsarchiver.data.local.DatabaseProvider
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import com.prasad.smsarchiver.data.worker.SmsUploadWorker
 import com.prasad.smsarchiver.service.SmsMonitorService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +29,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private val smsRepository = SmsRepository(application)
+    private val db = DatabaseProvider.get(application)
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -44,6 +49,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isLoading = false,
                     lastSyncTime = getCurrentTime()
                 )
+                refreshQueueCount()
                 Log.d(TAG, "Loaded ${messages.size} messages")
             } catch (e: Exception) {
                 Log.e(TAG, "Error loading messages: ${e.message}", e)
@@ -56,6 +62,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
+     * Refresh local upload queue count
+     */
+    fun refreshQueueCount() {
+        viewModelScope.launch {
+            try {
+                val count = db.queuedSmsDao().count()
+                _uiState.value = _uiState.value.copy(queuedCount = count)
+                Log.d(TAG, "Queue count: $count")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error reading queue count: ${e.message}")
+            }
+        }
+    }
+
+    /**
      * Start the foreground monitoring service
      */
     fun startMonitoring() {
@@ -63,6 +84,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             SmsMonitorService.startService(getApplication())
             _uiState.value = _uiState.value.copy(isMonitoring = true)
             Log.d(TAG, "Started monitoring service")
+            refreshQueueCount()
         } catch (e: Exception) {
             Log.e(TAG, "Error starting monitoring: ${e.message}", e)
             _uiState.value = _uiState.value.copy(error = e.message)
@@ -77,11 +99,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             SmsMonitorService.stopService(getApplication())
             _uiState.value = _uiState.value.copy(isMonitoring = false)
             Log.d(TAG, "Stopped monitoring service")
+            refreshQueueCount()
         } catch (e: Exception) {
             Log.e(TAG, "Error stopping monitoring: ${e.message}", e)
             _uiState.value = _uiState.value.copy(error = e.message)
         }
     }
+
 
     /**
      * Clear error message
@@ -105,5 +129,6 @@ data class MainUiState(
     val isMonitoring: Boolean = false,
     val isLoading: Boolean = false,
     val lastSyncTime: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    val queuedCount: Int = 0
 )

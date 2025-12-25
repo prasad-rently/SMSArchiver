@@ -65,7 +65,8 @@ class SmsReceiver : BroadcastReceiver() {
     private fun notifyUiOfNewSms(context: Context) {
         val intent = Intent("com.prasad.smsarchiver.NEW_SMS")
         context.sendBroadcast(intent)
-        Log.d(TAG, "Sent NEW_SMS broadcast to UI")
+        Log.d(TAG, "📢 Sent NEW_SMS broadcast to UI")
+        Log.d(TAG, "📢 Broadcast action: com.prasad.smsarchiver.NEW_SMS")
     }
 
     /**

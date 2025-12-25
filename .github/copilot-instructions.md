@@ -6,7 +6,7 @@ Android application that automatically archives SMS messages to Firebase Cloud S
 ## Tech Stack
 - **Language**: Kotlin
 - **UI Framework**: Jetpack Compose
-- **Cloud Storage**: Firebase Cloud Storage
+- **Cloud Database**: Firebase Firestore
 - **Target Platform**: Android (minimum SDK TBD)
 - **License**: MIT
 
@@ -44,10 +44,11 @@ Register `BroadcastReceiver` in `AndroidManifest.xml` with appropriate priority.
 
 ### Firebase Integration
 - Initialize Firebase in `Application` class
-- Use Firebase Authentication for user-specific storage paths
-- Structure Cloud Storage paths: `users/{userId}/sms/{timestamp}_{phone}.json`
-- Implement offline caching strategy for when network unavailable
-- Handle Firebase Storage security rules properly
+- Use Firebase Authentication for user-specific data paths
+- Structure Firestore paths: `users/{userId}/sms/{smsId}`
+- Each SMS is stored as a document with fields: id, address, body, timestamp, type, etc.
+- Use `SetOptions.merge()` to prevent duplicate uploads
+- Handle Firestore security rules properly
 
 ### Data Model
 ```kotlin
@@ -129,11 +130,17 @@ val cursor = contentResolver.query(
 Use `Telephony.Sms` constants, not hardcoded URIs.
 
 ### Uploading to Firebase Storage
-```kotlin
-val storageRef = Firebase.storage.reference
-val smsRef = storageRef.child("users/${userId}/sms/${filename}")
-smsRef.putBytes(jsonData.toByteArray())
+```kfirestore = FirebaseFirestore.getInstance()
+val documentId = "${message.id}_${message.timestamp}"
+
+firestore.collection("users")
+    .document(userId)
+    .collection("sms")
+    .document(documentId)
+    .set(message.toMap(), SetOptions.merge())
+    .await()
 ```
+Always use SetOptions.merge() to prevent overwriting and include error handling
 Always include error handling and retry logic.
 
 ## Next Steps for AI Agents
