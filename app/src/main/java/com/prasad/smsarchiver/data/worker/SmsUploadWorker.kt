@@ -5,9 +5,7 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
-import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.database.FirebaseDatabase
 import com.prasad.smsarchiver.data.repository.SmsRepository
 import com.prasad.smsarchiver.data.local.DatabaseProvider
 import com.prasad.smsarchiver.data.local.QueuedSmsEntity
@@ -17,7 +15,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * WorkManager worker for uploading SMS messages to Firebase Firestore
+ * WorkManager worker for uploading SMS messages to Firebase Realtime Database
  * Enhanced with comprehensive logging and dual SIM support
  */
 class SmsUploadWorker(
@@ -62,8 +60,8 @@ class SmsUploadWorker(
                 Log.d(TAG, "  └─ $simLabel: $count messages")
             }
 
-            // Upload to Firestore
-            uploadToFirestoreWithQueue(messages)
+            // Upload to Realtime Database
+            uploadToRealtimeWithQueue(messages)
 
             logSection("SMS UPLOAD WORK COMPLETED")
             Result.success()
@@ -73,11 +71,11 @@ class SmsUploadWorker(
         }
     }
 
-    private suspend fun uploadToFirestoreWithQueue(messages: List<com.prasad.smsarchiver.data.model.SmsMessage>) {
-        logSection("FIRESTORE UPLOAD PROCESS")
-        
+    private suspend fun uploadToRealtimeWithQueue(messages: List<com.prasad.smsarchiver.data.model.SmsMessage>) {
+        logSection("REALTIME DB UPLOAD PROCESS")
+
         val auth = FirebaseAuth.getInstance()
-        val firestore = FirebaseFirestore.getInstance()
+        val database = FirebaseDatabase.getInstance().reference
         val dao = DatabaseProvider.get(applicationContext).queuedSmsDao()
 
         // Step 1: Authentication
@@ -127,21 +125,21 @@ class SmsUploadWorker(
                         )
 
                         Log.d(TAG, "    🔄 Flushing SMS ID=${q.smsId} (SIM ${q.subscriptionId})")
-                        
-                        firestore.collection("users")
-                            .document(userId)
-                            .collection("sms")
-                            .document(documentId)
-                            .set(smsData, SetOptions.merge())
-                            .await()
+
+                        val smsRef = database
+                            .child("users")
+                            .child(userId)
+                            .child("sms")
+                            .child(documentId)
+
+                        smsRef.setValue(smsData).await()
                         
                         dao.deleteById(q.id)
                         flushed++
                         Log.d(TAG, "      ✅ Flushed successfully")
                     } catch (e: Exception) {
                         failed++
-                        val errorCode = (e as? FirebaseFirestoreException)?.code?.name ?: "UNKNOWN"
-                        Log.e(TAG, "      ❌ Flush failed [${errorCode}]: ${e.message}")
+                        Log.e(TAG, "      ❌ Flush failed: ${e.message}")
                     }
                 }
                 
@@ -172,22 +170,22 @@ class SmsUploadWorker(
                 smsData["uploadedAt"] = System.currentTimeMillis()
                 smsData["source"] = "direct"
 
-                firestore.collection("users")
-                    .document(userId)
-                    .collection("sms")
-                    .document(documentId)
-                    .set(smsData, SetOptions.merge())
-                    .await()
+                val smsRef = database
+                    .child("users")
+                    .child(userId)
+                    .child("sms")
+                    .child(documentId)
+
+                smsRef.setValue(smsData).await()
 
                 successCount++
                 Log.d(TAG, "      ✅ Upload successful")
                 
             } catch (e: Exception) {
                 errorCount++
-                val errorCode = (e as? FirebaseFirestoreException)?.code?.name ?: "UNKNOWN"
                 val errorMsg = e.message ?: "No error message"
-                
-                Log.e(TAG, "      ❌ Upload failed [${errorCode}]: $errorMsg")
+
+                Log.e(TAG, "      ❌ Upload failed: $errorMsg")
                 
                 // Queue for retry
                 try {
@@ -219,8 +217,8 @@ class SmsUploadWorker(
         Log.d(TAG, "  📊 Total processed: ${messages.size}")
         
         if (errorCount > 0) {
-            Log.w(TAG, "  ⚠️ Some messages failed to upload. Check Firestore configuration:")
-            Log.w(TAG, "     - Is Firestore enabled in Firebase Console?")
+            Log.w(TAG, "  ⚠️ Some messages failed to upload. Check Realtime Database configuration:")
+            Log.w(TAG, "     - Is Realtime Database enabled in Firebase Console?")
             Log.w(TAG, "     - Are security rules configured correctly?")
             Log.w(TAG, "     - Is anonymous authentication enabled?")
         }

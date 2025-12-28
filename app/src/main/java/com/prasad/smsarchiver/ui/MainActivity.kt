@@ -159,7 +159,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     onStartMonitoring = { viewModel.startMonitoring() },
                     onStopMonitoring = { viewModel.stopMonitoring() },
                     onRefresh = { viewModel.loadMessages() },
-                    onTestFirestore = { viewModel.testFirestoreWrite() }
+                    onTestRealtimeDb = { viewModel.testRealtimeDbWrite() }
                 )
             }
 
@@ -199,7 +199,7 @@ fun MainContent(
     onStartMonitoring: () -> Unit,
     onStopMonitoring: () -> Unit,
     onRefresh: () -> Unit,
-    onTestFirestore: () -> Unit = {}
+    onTestRealtimeDb: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Status Card
@@ -290,14 +290,14 @@ fun MainContent(
             }
         }
 
-        // Test Firestore Button
+        // Test Realtime Database Button
         OutlinedButton(
-            onClick = onTestFirestore,
+            onClick = onTestRealtimeDb,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 16.dp)
         ) {
-            Text(stringResource(R.string.test_firestore))
+            Text(stringResource(R.string.test_realtime_database))
         }
 
         // Messages List

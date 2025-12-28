@@ -12,8 +12,7 @@ import androidx.work.WorkManager
 import com.prasad.smsarchiver.data.worker.SmsUploadWorker
 import com.prasad.smsarchiver.service.SmsMonitorService
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
+import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -112,24 +111,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
 
     /**
-     * Test Firestore write and read to verify database connectivity
+     * Test Realtime Database write and read to verify connectivity
      * Enhanced with comprehensive debugging information
      */
-    fun testFirestoreWrite() {
+    fun testRealtimeDbWrite() {
         viewModelScope.launch {
             try {
-                logDebugSection("FIRESTORE DIAGNOSTIC TEST START")
-                _uiState.value = _uiState.value.copy(firebaseStatus = "🔍 Testing Firestore...")
+                logDebugSection("REALTIME DB DIAGNOSTIC TEST START")
+                _uiState.value = _uiState.value.copy(firebaseStatus = "🔍 Testing Realtime Database...")
 
                 val auth = FirebaseAuth.getInstance()
-                val firestore = FirebaseFirestore.getInstance()
+                val database = FirebaseDatabase.getInstance().reference
 
                 // Step 1: Check Firebase SDK initialization
                 Log.d(TAG, "📱 Step 1: Firebase SDK Check")
                 Log.d(TAG, "  └─ Auth instance: ${auth.app.name}")
-                Log.d(TAG, "  └─ Firestore instance: ${firestore.app.name}")
-                Log.d(TAG, "  └─ Project ID: ${firestore.app.options.projectId}")
-                Log.d(TAG, "  └─ App ID: ${firestore.app.options.applicationId}")
+                Log.d(TAG, "  └─ Database root: ${database.key ?: "/"}")
 
                 // Step 2: Authentication
                 Log.d(TAG, "🔐 Step 2: Authentication")
@@ -162,71 +159,68 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 Log.d(TAG, "  └─ Test data: $testData")
 
-                // Step 4: Define document path
-                val docPath = firestore.collection("users")
-                    .document(userId)
-                    .collection("diagnostics")
-                    .document("smokeTest")
-                
+                // Step 4: Define node path
+                val nodeRef = database
+                    .child("users")
+                    .child(userId)
+                    .child("diagnostics")
+                    .child("smokeTest")
+
                 val fullPath = "users/$userId/diagnostics/smokeTest"
-                Log.d(TAG, "📍 Step 4: Document Path")
+                Log.d(TAG, "📍 Step 4: Node Path")
                 Log.d(TAG, "  └─ Full path: $fullPath")
 
-                // Step 5: Write to Firestore
-                Log.d(TAG, "✍️ Step 5: Write to Firestore")
+                // Step 5: Write to Realtime Database
+                Log.d(TAG, "✍️ Step 5: Write to Realtime Database")
                 _uiState.value = _uiState.value.copy(firebaseStatus = "✍️ Writing test data...")
-                
+
                 try {
-                    docPath.set(testData, SetOptions.merge()).await()
+                    nodeRef.setValue(testData).await()
                     Log.d(TAG, "  ✅ Write operation completed successfully!")
                 } catch (writeError: Exception) {
                     Log.e(TAG, "  ❌ Write operation failed!", writeError)
                     Log.e(TAG, "  └─ Error type: ${writeError.javaClass.simpleName}")
                     Log.e(TAG, "  └─ Error message: ${writeError.message}")
-                    if (writeError is com.google.firebase.firestore.FirebaseFirestoreException) {
-                        Log.e(TAG, "  └─ Firestore error code: ${writeError.code}")
-                        Log.e(TAG, "  └─ Firestore error name: ${writeError.code.name}")
-                    }
                     throw writeError
                 }
 
-                // Step 6: Read back from Firestore
-                Log.d(TAG, "📖 Step 6: Read from Firestore")
+                // Step 6: Read back from Realtime Database
+                Log.d(TAG, "📖 Step 6: Read from Realtime Database")
                 _uiState.value = _uiState.value.copy(firebaseStatus = "📖 Reading test data...")
-                
-                val snapshot = docPath.get().await()
-                
+
+                val snapshot = nodeRef.get().await()
+
                 if (snapshot.exists()) {
-                    Log.d(TAG, "  ✅ Document exists!")
-                    Log.d(TAG, "  └─ Document ID: ${snapshot.id}")
-                    Log.d(TAG, "  └─ Data: ${snapshot.data}")
-                    
-                    val readMessage = snapshot.getString("message")
-                    val readTimestamp = snapshot.getLong("timestamp")
-                    
+                    Log.d(TAG, "  ✅ Node exists!")
+                    Log.d(TAG, "  └─ Key: ${snapshot.key}")
+                    Log.d(TAG, "  └─ Data: ${snapshot.value}")
+
+                    val readMessage = snapshot.child("message").getValue(String::class.java)
+                    val readTimestamp = snapshot.child("timestamp").getValue(Long::class.java)
+
                     Log.d(TAG, "  └─ Message: $readMessage")
                     Log.d(TAG, "  └─ Timestamp: $readTimestamp")
-                    
+
                     logDebugSection("TEST RESULT: SUCCESS ✅")
                     _uiState.value = _uiState.value.copy(
-                        firebaseStatus = "✅ SUCCESS! Data written & read from Firestore\n" +
+                        firebaseStatus = "✅ SUCCESS! Data written & read from Realtime Database\n" +
                                 "Path: $fullPath\n" +
                                 "Message: $readMessage"
                     )
                 } else {
-                    Log.w(TAG, "  ⚠️ Document does not exist after write!")
+                    Log.w(TAG, "  ⚠️ Node does not exist after write!")
                     Log.w(TAG, "  └─ This means write succeeded but read failed")
-                    Log.w(TAG, "  └─ Check Firestore security rules")
-                    
+                    Log.w(TAG, "  └─ Check Realtime Database security rules")
+
                     logDebugSection("TEST RESULT: PARTIAL SUCCESS ⚠️")
                     _uiState.value = _uiState.value.copy(
-                        firebaseStatus = "⚠️ Document written but not readable\n" +
-                                "Check Firestore security rules"
+                        firebaseStatus = "⚠️ Node written but not readable\n" +
+                                "Check Realtime Database security rules"
                     )
                 }
 
             } catch (e: Exception) {
-                Log.e(TAG, "❌ FIRESTORE TEST FAILED!", e)
+                Log.e(TAG, "❌ REALTIME DB TEST FAILED!", e)
                 Log.e(TAG, "  └─ Error type: ${e.javaClass.simpleName}")
                 Log.e(TAG, "  └─ Error message: ${e.message}")
                 Log.e(TAG, "  └─ Stack trace:")
@@ -235,14 +229,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 logDebugSection("TEST RESULT: FAILED ❌")
                 
                 val errorDetails = when {
-                    e is com.google.firebase.firestore.FirebaseFirestoreException -> {
-                        "Firestore Error [${e.code.name}]: ${e.message}"
-                    }
                     e.message?.contains("PERMISSION_DENIED") == true -> {
-                        "Permission Denied - Check Firestore rules"
+                        "Permission Denied - Check Realtime Database rules"
                     }
                     e.message?.contains("NOT_FOUND") == true -> {
-                        "Database Not Found - Create Firestore DB in console"
+                        "Database Not Found - Create Realtime Database in console"
                     }
                     e.message?.contains("network") == true -> {
                         "Network Error - Check internet connection"
