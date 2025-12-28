@@ -35,7 +35,8 @@ class SmsRepository(private val context: Context) {
             Telephony.Sms.READ,
             Telephony.Sms.SEEN,
             Telephony.Sms.PROTOCOL,
-            Telephony.Sms.SERVICE_CENTER
+            Telephony.Sms.SERVICE_CENTER,
+            Telephony.Sms.SUBSCRIPTION_ID
         )
 
         try {
@@ -58,6 +59,7 @@ class SmsRepository(private val context: Context) {
                 val seenIndex = it.getColumnIndexOrThrow(Telephony.Sms.SEEN)
                 val protocolIndex = it.getColumnIndexOrThrow(Telephony.Sms.PROTOCOL)
                 val serviceCenterIndex = it.getColumnIndexOrThrow(Telephony.Sms.SERVICE_CENTER)
+                val subscriptionIdIndex = it.getColumnIndex(Telephony.Sms.SUBSCRIPTION_ID)
 
                 while (it.moveToNext()) {
                     messages.add(
@@ -71,7 +73,8 @@ class SmsRepository(private val context: Context) {
                             read = it.getInt(readIndex) == 1,
                             seen = it.getInt(seenIndex) == 1,
                             protocol = it.getInt(protocolIndex),
-                            serviceCenter = it.getString(serviceCenterIndex)
+                            serviceCenter = it.getString(serviceCenterIndex),
+                            subscriptionId = if (subscriptionIdIndex >= 0) it.getInt(subscriptionIdIndex) else -1
                         )
                     )
                 }
@@ -103,7 +106,8 @@ class SmsRepository(private val context: Context) {
             Telephony.Sms.READ,
             Telephony.Sms.SEEN,
             Telephony.Sms.PROTOCOL,
-            Telephony.Sms.SERVICE_CENTER
+            Telephony.Sms.SERVICE_CENTER,
+            Telephony.Sms.SUBSCRIPTION_ID
         )
 
         val selection = "${Telephony.Sms.DATE} > ?"
@@ -129,6 +133,7 @@ class SmsRepository(private val context: Context) {
                 val seenIndex = it.getColumnIndexOrThrow(Telephony.Sms.SEEN)
                 val protocolIndex = it.getColumnIndexOrThrow(Telephony.Sms.PROTOCOL)
                 val serviceCenterIndex = it.getColumnIndexOrThrow(Telephony.Sms.SERVICE_CENTER)
+                val subscriptionIdIndex = it.getColumnIndex(Telephony.Sms.SUBSCRIPTION_ID)
 
                 while (it.moveToNext()) {
                     messages.add(
@@ -142,7 +147,8 @@ class SmsRepository(private val context: Context) {
                             read = it.getInt(readIndex) == 1,
                             seen = it.getInt(seenIndex) == 1,
                             protocol = it.getInt(protocolIndex),
-                            serviceCenter = it.getString(serviceCenterIndex)
+                            serviceCenter = it.getString(serviceCenterIndex),
+                            subscriptionId = if (subscriptionIdIndex >= 0) it.getInt(subscriptionIdIndex) else -1
                         )
                     )
                 }

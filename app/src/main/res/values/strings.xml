@@ -17,5 +17,6 @@
     <string name="new_sms_received">New SMS Received!</string>
     <string name="firebase_not_configured">Firebase not configured - SMS will not be uploaded</string>
     <string name="queue_count">Upload Queue: %d</string>
-    
+    <string name="test_firestore">Test Firestore</string>
+    <string name="firebase_status">Firebase: %s</string>
 </resources>

@@ -13,7 +13,8 @@ data class SmsMessage(
     val read: Boolean,
     val seen: Boolean,
     val protocol: Int? = null,
-    val serviceCenter: String? = null
+    val serviceCenter: String? = null,
+    val subscriptionId: Int = -1  // SIM card identifier for dual SIM phones (-1 = unknown)
 ) {
     companion object {
         const val MESSAGE_TYPE_INBOX = 1
@@ -37,6 +38,7 @@ data class SmsMessage(
         "read" to read,
         "seen" to seen,
         "protocol" to protocol,
-        "serviceCenter" to serviceCenter
+        "serviceCenter" to serviceCenter,
+        "subscriptionId" to subscriptionId
     )
 }

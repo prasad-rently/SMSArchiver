@@ -13,6 +13,7 @@ data class QueuedSmsEntity(
     val timestamp: Long,
     val type: Int,
     val read: Boolean,
+    val subscriptionId: Int = -1,
     val retryCount: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 )

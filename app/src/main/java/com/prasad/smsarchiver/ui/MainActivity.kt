@@ -158,7 +158,8 @@ fun MainScreen(viewModel: MainViewModel) {
                     uiState = uiState,
                     onStartMonitoring = { viewModel.startMonitoring() },
                     onStopMonitoring = { viewModel.stopMonitoring() },
-                    onRefresh = { viewModel.loadMessages() }
+                    onRefresh = { viewModel.loadMessages() },
+                    onTestFirestore = { viewModel.testFirestoreWrite() }
                 )
             }
 
@@ -197,7 +198,8 @@ fun MainContent(
     uiState: com.prasad.smsarchiver.ui.viewmodel.MainUiState,
     onStartMonitoring: () -> Unit,
     onStopMonitoring: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onTestFirestore: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Status Card
@@ -249,7 +251,14 @@ fun MainContent(
                     modifier = Modifier.padding(top = 4.dp)
                 )
 
-                
+                uiState.firebaseStatus?.let { status ->
+                    Text(
+                        text = stringResource(R.string.firebase_status, status),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
             }
         }
 
@@ -279,8 +288,16 @@ fun MainContent(
             ) {
                 Text("Refresh")
             }
+        }
 
-            
+        // Test Firestore Button
+        OutlinedButton(
+            onClick = onTestFirestore,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            Text(stringResource(R.string.test_firestore))
         }
 
         // Messages List
