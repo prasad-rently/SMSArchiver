@@ -6,7 +6,7 @@ Android application that automatically archives SMS messages to Firebase Cloud S
 ## Tech Stack
 - **Language**: Kotlin
 - **UI Framework**: Jetpack Compose
-- **Cloud Database**: Firebase Firestore
+- **Cloud Database**: Firebase Realtime Database
 - **Target Platform**: Android (minimum SDK TBD)
 - **License**: MIT
 
@@ -21,7 +21,7 @@ Android application that automatically archives SMS messages to Firebase Cloud S
 ### Key Design Decisions
 - Use `BroadcastReceiver` to trigger on SMS receipt
 - Leverage WorkManager for reliable background uploads (handles battery optimization)
-- Store SMS data in Firebase Cloud Storage (not Firestore) per project requirements
+- Store SMS data in Firebase Realtime Database per project requirements
 - Run continuously or triggered by SMS events based on user preference
 
 ## Development Guidelines
@@ -45,10 +45,10 @@ Register `BroadcastReceiver` in `AndroidManifest.xml` with appropriate priority.
 ### Firebase Integration
 - Initialize Firebase in `Application` class
 - Use Firebase Authentication for user-specific data paths
-- Structure Firestore paths: `users/{userId}/sms/{smsId}`
-- Each SMS is stored as a document with fields: id, address, body, timestamp, type, etc.
-- Use `SetOptions.merge()` to prevent duplicate uploads
-- Handle Firestore security rules properly
+- Structure Realtime Database paths: `users/{userId}/sms/{smsId}`
+- Each SMS is stored as a node with fields: id, address, body, timestamp, type, etc.
+- Use `setValue()` with appropriate merge logic to prevent duplicate uploads
+- Handle Realtime Database security rules properly
 
 ### Data Model
 ```kotlin
@@ -129,18 +129,18 @@ val cursor = contentResolver.query(
 ```
 Use `Telephony.Sms` constants, not hardcoded URIs.
 
-### Uploading to Firebase Storage
-```kfirestore = FirebaseFirestore.getInstance()
+### Uploading to Realtime Database
+```kotlin
+val database = FirebaseDatabase.getInstance().reference
 val documentId = "${message.id}_${message.timestamp}"
 
-firestore.collection("users")
-    .document(userId)
-    .collection("sms")
-    .document(documentId)
-    .set(message.toMap(), SetOptions.merge())
+database.child("users")
+    .child(userId)
+    .child("sms")
+    .child(documentId)
+    .setValue(message.toMap())
     .await()
 ```
-Always use SetOptions.merge() to prevent overwriting and include error handling
 Always include error handling and retry logic.
 
 ## Next Steps for AI Agents

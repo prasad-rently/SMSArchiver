@@ -138,7 +138,7 @@ suspend fun getAllMessages(): List<SmsMessage> {
 
 **File:** `app/src/main/java/com/prasad/smsarchiver/data/worker/SmsUploadWorker.kt`
 
-**Purpose:** Uploads SMS to Firebase Cloud Storage (NOT Firestore!)
+**Purpose:** Uploads SMS to Firebase Realtime Database
 
 **How it works:**
 ```kotlin
@@ -171,9 +171,7 @@ Firebase Cloud Storage/
             └── ...
 ```
 
-**Important:** Uses **Cloud Storage**, not **Firestore**!
-- Cloud Storage = File storage (like Dropbox)
-- Firestore = NoSQL database
+**Important:** Uses **Realtime Database** (NoSQL JSON tree database)
 
 ---
 
