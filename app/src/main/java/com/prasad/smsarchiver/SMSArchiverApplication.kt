@@ -39,19 +39,9 @@ class SMSArchiverApplication : Application() {
                         Log.d(TAG, "Already signed in: uid=${auth.currentUser?.uid}")
                     }
 
-                    // Trigger a lightweight worker run to flush any queued items only.
-                    // We pass 'timestamp' = now so the worker will not read past SMS,
-                    // but it will still flush the local queue first.
-                    try {
-                        val now = System.currentTimeMillis()
-                        val req = OneTimeWorkRequestBuilder<com.prasad.smsarchiver.data.worker.SmsUploadWorker>()
-                            .setInputData(workDataOf("timestamp" to now))
-                            .build()
-                        WorkManager.getInstance(applicationContext).enqueue(req)
-                        Log.d(TAG, "Scheduled initial worker to flush queue (ts=$now)")
-                    } catch (we: Exception) {
-                        Log.e(TAG, "Failed to schedule initial flush: ${we.message}")
-                    }
+                    // Auto-upload on app launch is disabled to prevent
+                    // unintended bulk uploads. Users can trigger uploads
+                    // manually from the UI.
                 } catch (ae: Exception) {
                     Log.e(TAG, "Anonymous auth failed: ${ae.message}")
                 }

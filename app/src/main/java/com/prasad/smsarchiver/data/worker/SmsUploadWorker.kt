@@ -32,9 +32,23 @@ class SmsUploadWorker(
     override suspend fun doWork(): Result {
         return try {
             logSection("STARTING SMS UPLOAD WORK")
+            
+                // Log work request details
+                Log.d(TAG, "📋 Work Request ID: ${this.id}")
+                Log.d(TAG, "🔢 Run attempt: ${this.runAttemptCount}")
+                Log.d(TAG, "📱 Device: ${android.os.Build.MODEL} (Android ${android.os.Build.VERSION.SDK_INT})")
 
             val afterTimestamp = inputData.getLong("timestamp", 0L)
-            Log.d(TAG, "📌 Timestamp filter: $afterTimestamp (${formatTimestamp(afterTimestamp)})")
+                if (afterTimestamp == 0L) {
+                    Log.d(TAG, "📌 Timestamp filter: 0 (UPLOADING ALL SMS FROM DEVICE)")
+                } else {
+                    Log.d(TAG, "📌 Timestamp filter: $afterTimestamp (${formatTimestamp(afterTimestamp)})")
+                    Log.d(TAG, "   └─ Uploading SMS newer than or equal to this time")
+                }
+
+            // Give the platform a brief moment to persist the SMS to the provider
+            // (avoids a race where the broadcast arrives before the row is visible)
+            kotlinx.coroutines.delay(1200)
 
             // Read SMS messages
             val messages = if (afterTimestamp > 0) {
@@ -49,6 +63,11 @@ class SmsUploadWorker(
             }
 
             Log.d(TAG, "📨 Found ${messages.size} SMS messages to process")
+            
+            // Log message details for debugging
+            messages.forEachIndexed { index, msg ->
+                Log.d(TAG, "  SMS [${index + 1}]: ID=${msg.id}, From=${msg.address}, Time=${formatTimestamp(msg.timestamp)}")
+            }
             
             // Log SIM distribution
             val simCounts = messages.groupingBy { it.subscriptionId }.eachCount()
@@ -157,10 +176,14 @@ class SmsUploadWorker(
 
         for ((index, message) in messages.withIndex()) {
             try {
+                // Create unique document ID: SMS_ID + timestamp
+                // This prevents duplicates - same SMS will always have same documentId
+                // If uploaded multiple times, setValue() will overwrite with identical data
                 val documentId = "${message.id}_${message.timestamp}"
                 val simLabel = if (message.subscriptionId >= 0) "SIM ${message.subscriptionId}" else "Unknown SIM"
                 
                 Log.d(TAG, "  📨 [${index + 1}/${messages.size}] Uploading SMS ID=${message.id} ($simLabel)")
+                Log.d(TAG, "      Document ID: $documentId")
                 Log.d(TAG, "      From: ${message.address}")
                 Log.d(TAG, "      Preview: ${message.body.take(50)}...")
                 Log.d(TAG, "      Time: ${formatTimestamp(message.timestamp)}")

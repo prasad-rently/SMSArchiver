@@ -6,9 +6,13 @@ import android.content.Intent
 import android.provider.Telephony
 import android.util.Log
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.Constraints
+import androidx.work.NetworkType
+import androidx.work.BackoffPolicy
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.prasad.smsarchiver.data.worker.SmsUploadWorker
+import java.util.concurrent.TimeUnit
 
 /**
  * BroadcastReceiver that listens for incoming SMS messages
@@ -71,17 +75,30 @@ class SmsReceiver : BroadcastReceiver() {
 
     /**
      * Schedule WorkManager task to read and upload SMS messages
+     * Uses timestamp - 1000ms to ensure we capture all SMS from the last second,
+     * preventing edge cases where multiple SMS arrive simultaneously
      */
     private fun scheduleUploadWork(context: Context, timestamp: Long) {
+        // Subtract 2 seconds to ensure we catch any SMS that arrived in the last couple seconds
+        val searchTimestamp = timestamp - 2000
+        
+        // Require network and avoid running when battery is critically low
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .setRequiresBatteryNotLow(true)
+            .build()
+        
         val uploadWorkRequest = OneTimeWorkRequestBuilder<SmsUploadWorker>()
             .setInputData(
                 workDataOf(
-                    "timestamp" to timestamp
+                    "timestamp" to searchTimestamp
                 )
             )
+            .setConstraints(constraints)
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
 
         WorkManager.getInstance(context).enqueue(uploadWorkRequest)
-        Log.d(TAG, "Scheduled SMS upload work")
+        Log.d(TAG, "📤 Scheduled SMS upload work (searching from timestamp: $searchTimestamp)")
     }
 }

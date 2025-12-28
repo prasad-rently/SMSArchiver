@@ -110,8 +110,10 @@ class SmsRepository(private val context: Context) {
             Telephony.Sms.SUBSCRIPTION_ID
         )
 
-        val selection = "${Telephony.Sms.DATE} > ?"
+        val selection = "${Telephony.Sms.DATE} >= ?"
         val selectionArgs = arrayOf(timestamp.toString())
+
+        Log.d(TAG, "Querying SMS with date >= $timestamp")
 
         try {
             val cursor: Cursor? = contentResolver.query(

@@ -109,6 +109,51 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Manually trigger upload of all SMS from device to Firebase
+     * This uses timestamp=0 to upload all messages, not just new ones
+     */
+    fun uploadAllSms() {
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "=== MANUAL UPLOAD ALL SMS TRIGGERED ===")
+                _uiState.value = _uiState.value.copy(
+                    firebaseStatus = "📤 Uploading all SMS to Firebase..."
+                )
+                
+                // Schedule WorkManager job with timestamp=0 to upload ALL SMS
+                val workRequest = OneTimeWorkRequestBuilder<SmsUploadWorker>()
+                    .setInputData(
+                        androidx.work.workDataOf(
+                            "timestamp" to 0L  // 0 means upload ALL SMS
+                        )
+                    )
+                    .build()
+                
+                WorkManager.getInstance(getApplication())
+                    .enqueue(workRequest)
+                
+                Log.d(TAG, "WorkManager job scheduled for uploading all SMS")
+                Log.d(TAG, "Work Request ID: ${workRequest.id}")
+                
+                _uiState.value = _uiState.value.copy(
+                    firebaseStatus = "⏳ Upload in progress... Check logs for details"
+                )
+                
+                // Refresh queue count after a delay to see results
+                kotlinx.coroutines.delay(3000)
+                refreshQueueCount()
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Error triggering upload: ${e.message}", e)
+                _uiState.value = _uiState.value.copy(
+                    error = e.message,
+                    firebaseStatus = "❌ Upload failed: ${e.message}"
+                )
+            }
+        }
+    }
+
 
     /**
      * Test Realtime Database write and read to verify connectivity

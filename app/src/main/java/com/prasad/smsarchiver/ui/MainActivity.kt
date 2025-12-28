@@ -159,7 +159,8 @@ fun MainScreen(viewModel: MainViewModel) {
                     onStartMonitoring = { viewModel.startMonitoring() },
                     onStopMonitoring = { viewModel.stopMonitoring() },
                     onRefresh = { viewModel.loadMessages() },
-                    onTestRealtimeDb = { viewModel.testRealtimeDbWrite() }
+                        onTestRealtimeDb = { viewModel.testRealtimeDbWrite() },
+                        onUploadAll = { viewModel.uploadAllSms() }
                 )
             }
 
@@ -199,7 +200,8 @@ fun MainContent(
     onStartMonitoring: () -> Unit,
     onStopMonitoring: () -> Unit,
     onRefresh: () -> Unit,
-    onTestRealtimeDb: () -> Unit = {}
+    onTestRealtimeDb: () -> Unit = {},
+    onUploadAll: () -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Status Card
@@ -299,6 +301,19 @@ fun MainContent(
         ) {
             Text(stringResource(R.string.test_realtime_database))
         }
+
+            // Upload All SMS Button
+            Button(
+                onClick = onUploadAll,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondary
+                )
+            ) {
+                Text("📤 Upload All SMS to Firebase")
+            }
 
         // Messages List
         if (uiState.isLoading) {
