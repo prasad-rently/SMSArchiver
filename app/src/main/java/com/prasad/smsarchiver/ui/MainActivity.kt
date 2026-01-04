@@ -31,12 +31,14 @@ import com.prasad.smsarchiver.R
 import com.prasad.smsarchiver.data.model.SmsMessage
 import com.prasad.smsarchiver.ui.theme.SMSArchiverTheme
 import com.prasad.smsarchiver.ui.viewmodel.MainViewModel
+import com.prasad.smsarchiver.ui.viewmodel.ClipboardViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     private val viewModel: MainViewModel by viewModels()
+    private val clipboardViewModel: ClipboardViewModel by viewModels()
     
     private val smsReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -93,7 +95,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainScreen(viewModel)
+                    MainScreen(viewModel, clipboardViewModel)
                 }
             }
         }
@@ -112,7 +114,256 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun MainScreen(viewModel: MainViewModel, clipboardViewModel: ClipboardViewModel) {
+    val uiState by viewModel.uiState.collectAsState()
+    var selectedTab by remember { mutableStateOf(0) }
+
+    // Request necessary permissions
+    val permissionsToRequest = buildList {
+        add(Manifest.permission.READ_SMS)
+        add(Manifest.permission.RECEIVE_SMS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    val permissionsState = rememberMultiplePermissionsState(permissionsToRequest)
+
+    LaunchedEffect(permissionsState.allPermissionsGranted) {
+        if (permissionsState.allPermissionsGranted) {
+            viewModel.loadMessages()
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.app_name)) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            )
+        }
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
+            if (!permissionsState.allPermissionsGranted) {
+                PermissionRequestContent(
+                    onRequestPermissions = { permissionsState.launchMultiplePermissionRequest() }
+                )
+            } else {
+                // Tab Row
+                TabRow(selectedTabIndex = selectedTab) {
+                    Tab(
+                        selected = selectedTab == 0,
+                        onClick = { selectedTab = 0 },
+                        text = { Text("SMS") }
+                    )
+                    Tab(
+                        selected = selectedTab == 1,
+                        onClick = { selectedTab = 1 },
+                        text = { Text("Clipboard") }
+                    )
+                }
+
+                // Tab Content
+                when (selectedTab) {
+                    0 -> SmsTabContent(viewModel, uiState)
+                    1 -> ClipboardTabContent(clipboardViewModel)
+                }
+            }
+
+            // Show error snackbar
+            uiState.error?.let { error ->
+                LaunchedEffect(error) {
+                    // Error handling could be enhanced with Snackbar
+                    viewModel.clearError()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SmsTabContent(viewModel: MainViewModel, uiState: com.prasad.smsarchiver.ui.viewmodel.MainUiState) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        MainContent(
+            uiState = uiState,
+            onStartMonitoring = { viewModel.startMonitoring() },
+            onStopMonitoring = { viewModel.stopMonitoring() },
+            onRefresh = { viewModel.loadMessages() },
+            onTestRealtimeDb = { viewModel.testRealtimeDbWrite() },
+            onUploadAll = { viewModel.uploadAllSms() }
+        )
+    }
+}
+
+@Composable
+fun ClipboardTabContent(clipboardViewModel: ClipboardViewModel) {
+    val uiState by clipboardViewModel.uiState.collectAsState()
+
+    // Always refresh snapshot when the tab is composed to avoid stale/empty UI
+    LaunchedEffect(Unit) {
+        clipboardViewModel.refreshClipboard()
+    }
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        // Status Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer
+            )
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Clipboard History: ${uiState.totalCount} items",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = if (uiState.isMonitoring) "✅ Monitoring Active" else "⏸️ Monitoring Paused",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (uiState.isMonitoring) 
+                        MaterialTheme.colorScheme.primary 
+                    else 
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+
+        // Control Buttons
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Button(
+                onClick = { 
+                    if (uiState.isMonitoring) {
+                        clipboardViewModel.stopMonitoring()
+                    } else {
+                        clipboardViewModel.startMonitoring()
+                    }
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(if (uiState.isMonitoring) "Stop Monitor" else "Start Monitor")
+            }
+
+            OutlinedButton(
+                onClick = { clipboardViewModel.refreshClipboard() },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Refresh")
+            }
+        }
+
+        // Clipboard Items List
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else if (uiState.items.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No clipboard items yet\nStart monitoring to save your clipboard history",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(uiState.items) { item ->
+                    ClipboardItemCard(
+                        item = item,
+                        onCopy = { clipboardViewModel.copyToClipboard(item) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ClipboardItemCard(
+    item: com.prasad.smsarchiver.data.model.ClipboardItem,
+    onCopy: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onCopy,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            // Content preview
+            Text(
+                text = item.content.take(200) + if (item.content.length > 200) "..." else "",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            
+            // Timestamp
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = formatClipboardTimestamp(item.timestamp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                
+                Text(
+                    text = "${item.content.length} chars",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+private fun formatClipboardTimestamp(timestamp: Long): String {
+    val dateFormat = SimpleDateFormat("MMM dd, yyyy HH:mm:ss", Locale.getDefault())
+    return dateFormat.format(Date(timestamp))
+}
+
+@OptIn(ExperimentalPermissionsApi::class, ExperimentalMaterial3Api::class)
+@Composable
+fun MainScreen_Old(viewModel: MainViewModel) {
     val uiState by viewModel.uiState.collectAsState()
 
     // Request necessary permissions

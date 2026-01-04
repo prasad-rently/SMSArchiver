@@ -57,6 +57,13 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- Foreground Service for clipboard monitoring -->
+        <service
+            android:name=".service.ClipboardMonitorService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
     </application>
 
 </manifest>
