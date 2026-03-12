@@ -209,17 +209,53 @@ fun SmsTabContent(viewModel: MainViewModel, uiState: com.prasad.smsarchiver.ui.v
 @Composable
 fun ClipboardTabContent(clipboardViewModel: ClipboardViewModel) {
     val uiState by clipboardViewModel.uiState.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
-    // Always refresh snapshot when the tab is composed to avoid stale/empty UI
+    // Re-check accessibility status every time this tab is composed (handles return from Settings)
     LaunchedEffect(Unit) {
+        clipboardViewModel.checkAccessibilityStatus()
         clipboardViewModel.refreshClipboard()
     }
-    
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
+        // Accessibility setup card — shown when service is not enabled
+        if (!uiState.isAccessibilityEnabled) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Setup Required",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Background clipboard monitoring requires the Accessibility permission. " +
+                                "This is the only way Android allows apps to read clipboard content in the background.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = { clipboardViewModel.openAccessibilitySettings(context) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Enable in Accessibility Settings")
+                    }
+                }
+            }
+        }
+
         // Status Card
         Card(
             modifier = Modifier
@@ -234,63 +270,46 @@ fun ClipboardTabContent(clipboardViewModel: ClipboardViewModel) {
                     text = "Clipboard History: ${uiState.totalCount} items",
                     style = MaterialTheme.typography.titleMedium
                 )
-                
                 Spacer(modifier = Modifier.height(8.dp))
-                
                 Text(
-                    text = if (uiState.isMonitoring) "✅ Monitoring Active" else "⏸️ Monitoring Paused",
+                    text = if (uiState.isAccessibilityEnabled)
+                        "Monitoring Active — copies synced automatically"
+                    else
+                        "Monitoring Off — enable Accessibility permission above",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (uiState.isMonitoring) 
-                        MaterialTheme.colorScheme.primary 
-                    else 
+                    color = if (uiState.isAccessibilityEnabled)
+                        MaterialTheme.colorScheme.primary
+                    else
                         MaterialTheme.colorScheme.onSecondaryContainer
                 )
             }
         }
 
-        // Control Buttons
-        Row(
+        // Refresh button
+        OutlinedButton(
+            onClick = {
+                clipboardViewModel.checkAccessibilityStatus()
+                clipboardViewModel.refreshClipboard()
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(bottom = 16.dp)
         ) {
-            Button(
-                onClick = { 
-                    if (uiState.isMonitoring) {
-                        clipboardViewModel.stopMonitoring()
-                    } else {
-                        clipboardViewModel.startMonitoring()
-                    }
-                },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(if (uiState.isMonitoring) "Stop Monitor" else "Start Monitor")
-            }
-
-            OutlinedButton(
-                onClick = { clipboardViewModel.refreshClipboard() },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Refresh")
-            }
+            Text("Refresh")
         }
 
         // Clipboard Items List
         if (uiState.isLoading) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else if (uiState.items.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    text = "No clipboard items yet\nStart monitoring to save your clipboard history",
+                    text = if (uiState.isAccessibilityEnabled)
+                        "No clipboard items yet.\nCopy something on this device to sync it."
+                    else
+                        "Enable the Accessibility permission above\nto start syncing clipboard content.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -324,17 +343,33 @@ fun ClipboardItemCard(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp)
-        ) {
-            // Content preview
-            Text(
-                text = item.content.take(200) + if (item.content.length > 200) "..." else "",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            
-            // Timestamp
+        Column(modifier = Modifier.padding(12.dp)) {
+            if (item.contentType == "image") {
+                // Image item
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Image",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text(
+                        text = item.imageUrl?.take(60)?.plus("...") ?: "Syncing...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+            } else {
+                // Text item
+                Text(
+                    text = item.content.take(200) + if (item.content.length > 200) "..." else "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+
+            // Footer row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -345,9 +380,8 @@ fun ClipboardItemCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                
                 Text(
-                    text = "${item.content.length} chars",
+                    text = if (item.contentType == "image") "image" else "${item.content.length} chars",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

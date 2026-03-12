@@ -14,5 +14,7 @@ data class QueuedClipboardEntity(
     val content: String,
     val timestamp: Long,
     val source: String?,
-    val contentHash: String
+    val contentHash: String,
+    val contentType: String = "text",   // "text" or "image"
+    val imageUri: String? = null        // Original content:// URI for images (retry uploads)
 )

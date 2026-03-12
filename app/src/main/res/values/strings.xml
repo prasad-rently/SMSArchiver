@@ -19,4 +19,5 @@
     <string name="queue_count">Upload Queue: %d</string>
     <string name="test_realtime_database">Test Realtime DB</string>
     <string name="firebase_status">Firebase: %s</string>
+    <string name="accessibility_service_description">Enables background clipboard monitoring so SMS Archiver can capture and sync copied text and images across your devices.</string>
 </resources>
